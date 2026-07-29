@@ -4,6 +4,7 @@
 支持：博主筛选Tab、关键词搜索、按播放/点赞排序、详情弹窗、创作灵感侧栏。
 """
 import json
+import urllib.parse
 from pathlib import Path
 
 
@@ -14,7 +15,15 @@ def generate_html(data):
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="爆款工作台">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="data:application/json;charset=utf-8,__MANIFEST__">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,__ICON__">
+<link rel="icon" href="data:image/svg+xml;utf8,__ICON__">
 <title>爆款素材工作台 · __DATE__</title>
 <style>
 :root {
@@ -507,11 +516,54 @@ function init() {
 }
 init();
 </script>
+<script>
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE='workbench-v1';
+    self.addEventListener('install',e=>{self.skipWaiting()});
+    self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim())});
+    self.addEventListener('fetch',e=>{
+      if(e.request.method!=='GET')return;
+      e.respondWith(
+        caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+          try{const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone))}catch(err){}
+          return res;
+        }).catch(()=>r))
+      );
+    });
+  `;
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(()=>{});
+}
+</script>
 </body>
 </html>
 """
 
-    html = html.replace("__DATA__", data_json).replace("__DATE__", data["date"])
+    # PWA manifest 和 icon
+    svg_raw = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0f1117"/><text x="256" y="370" font-size="300" text-anchor="middle">🔥</text></svg>'
+    icon_encoded = urllib.parse.quote(svg_raw, safe='')
+
+    manifest = json.dumps({
+        "name": "爆款素材工作台",
+        "short_name": "爆款工作台",
+        "description": "每日抓取B站高赞爆款素材，为创作提供灵感",
+        "start_url": "/",
+        "display": "standalone",
+        "orientation": "portrait",
+        "background_color": "#0f1117",
+        "theme_color": "#0f1117",
+        "icons": [{"src": "data:image/svg+xml;utf8," + icon_encoded, "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+    }, ensure_ascii=False)
+    manifest_encoded = urllib.parse.quote(manifest, safe='')
+
+    html = (html
+            .replace("__DATA__", data_json)
+            .replace("__DATE__", data["date"])
+            .replace("__MANIFEST__", manifest_encoded)
+            .replace("__ICON__", icon_encoded)
+    )
     return html
 
 
