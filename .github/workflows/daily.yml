@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 jobs:
-  fetch-and-deploy:
+  fetch-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
@@ -36,14 +36,14 @@ jobs:
         run: python build_app.py
 
       - name: 同步为首页
-        run: cp 工作台.html index.html
+        run: cp 工作台.html index.html && cp 工作台.html dashboard.html
 
       - name: 提交更新
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add daily_data.json 工作台.html index.html dashboard.html
-          git diff --quiet && git diff --cached --quiet || git commit -m "每日更新: $(date -u -d '+8 hours' '+Y%-m-%d') 爆款素材"
+          git diff --quiet && git diff --cached --quiet || git commit -m "每日更新: $(date -u -d '+8 hours' '+%Y-%m-%d') 爆款素材"
           git push
 
       - name: 配置 GitHub Pages
@@ -54,6 +54,13 @@ jobs:
         with:
           path: '.'
 
+  deploy:
+    needs: fetch-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
